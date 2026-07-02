@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fish &amp; Ships</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #87ceeb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      padding: 12px;
+      font-size: 1.8rem;
+      color: #1a3a5c;
+      background: rgba(255,255,255,0.3);
+      letter-spacing: 2px;
+    }
+    canvas { display: block; }
+    #back {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.4rem 1.2rem;
+      background: rgba(255,255,255,0.4);
+      border: 1px solid #1a3a5c;
+      border-radius: 4px;
+      color: #1a3a5c;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐟 Fish &amp; Ships ⛵</h1>
+  <canvas id="c"></canvas>
+  <a href="index.html" id="back">← Back</a>
+
+  <script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight - 56;
+    }
+    resize();
+    window.addEventListener("resize", () => { resize(); initScene(); });
+
+    const W = () => canvas.width;
+    const H = () => canvas.height;
+
+    // ── helpers ──────────────────────────────────────────────
+    function rand(a, b) { return a + Math.random() * (b - a); }
+    function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+
+    // ── scene objects ────────────────────────────────────────
+    let ships = [], fish = [], bubbles = [], waves = [];
+
+    function initScene() {
+      ships   = Array.from({ length: 3 }, (_, i) => makeShip(i));
+      fish    = Array.from({ length: 12 }, () => makeFish());
+      bubbles = [];
+      waves   = Array.from({ length: 6 }, (_, i) => ({ x: (W() / 6) * i, speed: rand(0.4, 0.9), amp: rand(8, 18), phase: rand(0, Math.PI * 2) }));
+    }
+
+    const SURFACE = () => H() * 0.38;
+
+    function makeShip(index) {
+      const dir = Math.random() > 0.5 ? 1 : -1;
+      return {
+        x: dir === 1 ? -220 : W() + 220,
+        y: SURFACE() - 10,
+        dir,
+        speed: rand(0.6, 1.4),
+        color: ["#c0392b","#2980b9","#27ae60","#8e44ad","#e67e22"][randInt(0,4)],
+        masts:  randInt(1, 2),
+        width:  rand(90, 140),
+        height: rand(30, 50),
+        bobPhase: rand(0, Math.PI * 2),
+      };
+    }
+
+    function makeFish() {
+      const deep = rand(SURFACE() + 30, H() - 40);
+      const dir  = Math.random() > 0.5 ? 1 : -1;
+      return {
+        x: rand(0, W()),
+        y: deep,
+        dir,
+        speed: rand(0.5, 1.8),
+        size: rand(14, 32),
+        color: ["#e74c3c","#e67e22","#f1c40f","#1abc9c","#3498db","#9b59b6","#fd79a8","#00b894"][randInt(0,7)],
+        wobble: rand(0, Math.PI * 2),
+        wobbleSpeed: rand(0.03, 0.07),
+        depth: deep,
+      };
+    }
+
+    // ── draw ship ────────────────────────────────────────────
+    function drawShip(s, t) {
+      const bob = Math.sin(t * 0.001 * 1.5 + s.bobPhase) * 3;
+      const y = s.y + bob;
+      ctx.save();
+      ctx.translate(s.x, y);
+      if (s.dir === -1) ctx.scale(-1, 1);
+
+      const w = s.width, h = s.height;
+
+      // Hull
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(-w * 0.4, h * 0.7);
+      ctx.quadraticCurveTo(0, h, w * 0.4, h * 0.7);
+      ctx.lineTo(w / 2, 0);
+      ctx.closePath();
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.strokeStyle = "#1a1a2e";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Deck
+      ctx.fillStyle = "#f5e6c8";
+      ctx.fillRect(-w * 0.45, -h * 0.12, w * 0.9, h * 0.15);
+
+      // Masts & sails
+      for (let m = 0; m < s.masts; m++) {
+        const mx = m === 0 ? -w * 0.15 : w * 0.15;
+        const mh = h * (1.4 + m * 0.2);
+
+        ctx.strokeStyle = "#5d4037";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(mx, -h * 0.12);
+        ctx.lineTo(mx, -mh);
+        ctx.stroke();
+
+        // Sail
+        ctx.beginPath();
+        ctx.moveTo(mx, -h * 0.15);
+        ctx.quadraticCurveTo(mx + w * 0.35, -mh * 0.6, mx, -mh);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.fill();
+        ctx.strokeStyle = "#bbb";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Flag
+      ctx.fillStyle = "#e74c3c";
+      ctx.beginPath();
+      ctx.moveTo(s.masts > 1 ? w * 0.15 : -w * 0.15, -h * (s.masts > 1 ? 1.7 : 1.4));
+      ctx.lineTo(s.masts > 1 ? w * 0.35 : w * 0.05, -h * (s.masts > 1 ? 1.6 : 1.3));
+      ctx.lineTo(s.masts > 1 ? w * 0.15 : -w * 0.15, -h * (s.masts > 1 ? 1.5 : 1.2));
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // ── draw fish ────────────────────────────────────────────
+    function drawFish(f) {
+      const wobbleY = Math.sin(f.wobble) * 4;
+      ctx.save();
+      ctx.translate(f.x, f.y + wobbleY);
+      if (f.dir === -1) ctx.scale(-1, 1);
+
+      const s = f.size;
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s, s * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = f.color;
+      ctx.fill();
+
+      // Tail
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.lineTo(-s * 1.6, -s * 0.6);
+      ctx.lineTo(-s * 1.6, s * 0.6);
+      ctx.closePath();
+      ctx.fillStyle = f.color;
+      ctx.fill();
+
+      // Belly
+      ctx.beginPath();
+      ctx.ellipse(s * 0.1, s * 0.1, s * 0.7, s * 0.3, 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fill();
+
+      // Eye
+      ctx.beginPath();
+      ctx.arc(s * 0.55, -s * 0.1, s * 0.18, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s * 0.6, -s * 0.1, s * 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // ── draw bubble ──────────────────────────────────────────
+    function drawBubble(b) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // ── draw water ───────────────────────────────────────────
+    function drawWater(t) {
+      const surf = SURFACE();
+
+      // Deep ocean gradient
+      const grad = ctx.createLinearGradient(0, surf, 0, H());
+      grad.addColorStop(0, "#1e90ff");
+      grad.addColorStop(0.4, "#1565c0");
+      grad.addColorStop(1, "#0d2137");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, surf, W(), H() - surf);
+
+      // Wave crests
+      ctx.beginPath();
+      ctx.moveTo(0, surf);
+      for (let x = 0; x <= W(); x += 4) {
+        let y = surf;
+        waves.forEach(w => { y += Math.sin((x / 80 + t * 0.001 * w.speed) + w.phase) * w.amp; });
+        y /= waves.length * 0.65;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W(), H());
+      ctx.lineTo(0, H());
+      ctx.closePath();
+      ctx.fillStyle = "#1e90ff";
+      ctx.fill();
+
+      // Foam line
+      ctx.beginPath();
+      ctx.moveTo(0, surf);
+      for (let x = 0; x <= W(); x += 4) {
+        let y = surf;
+        waves.forEach(w => { y += Math.sin((x / 80 + t * 0.001 * w.speed) + w.phase) * w.amp; });
+        y /= waves.length * 0.65;
+        ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // ── draw sky ─────────────────────────────────────────────
+    function drawSky() {
+      const grad = ctx.createLinearGradient(0, 0, 0, SURFACE());
+      grad.addColorStop(0, "#5599dd");
+      grad.addColorStop(1, "#aad4f5");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W(), SURFACE());
+
+      // Sun
+      ctx.beginPath();
+      ctx.arc(W() * 0.85, 40, 30, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffe066";
+      ctx.fill();
+      ctx.shadowColor = "#ffe066";
+      ctx.shadowBlur = 30;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Clouds
+      [[W()*0.1,30,70],[W()*0.4,20,90],[W()*0.65,50,60]].forEach(([cx,cy,cw]) => {
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        [[-cw*0.3,0,cw*0.45],[ 0,-cy*0.4,cw*0.55],[cw*0.3,0,cw*0.4]].forEach(([ox,oy,r]) => {
+          ctx.beginPath();
+          ctx.arc(cx + ox, cy + oy + 15, r * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+    }
+
+    // ── main loop ────────────────────────────────────────────
+    function loop(t) {
+      ctx.clearRect(0, 0, W(), H());
+
+      drawSky();
+      drawWater(t);
+
+      // Update & draw ships
+      ships.forEach((s, i) => {
+        s.x += s.speed * s.dir;
+        if (s.dir === 1 && s.x > W() + 220) Object.assign(s, makeShip(i), { x: -220, dir: 1 });
+        if (s.dir === -1 && s.x < -220)     Object.assign(s, makeShip(i), { x: W() + 220, dir: -1 });
+        drawShip(s, t);
+      });
+
+      // Water overlay for ships below surface
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#1e90ff";
+      ctx.fillRect(0, SURFACE() + 10, W(), 20);
+      ctx.restore();
+
+      // Bubbles
+      if (Math.random() < 0.06) {
+        bubbles.push({ x: rand(0, W()), y: H() - 10, r: rand(2, 6), speed: rand(0.5, 1.5) });
+      }
+      bubbles = bubbles.filter(b => b.y > SURFACE());
+      bubbles.forEach(b => { b.y -= b.speed; b.x += Math.sin(b.y * 0.1) * 0.5; drawBubble(b); });
+
+      // Update & draw fish
+      fish.forEach((f, i) => {
+        f.x += f.speed * f.dir;
+        f.wobble += f.wobbleSpeed;
+        if (f.dir === 1 && f.x > W() + 60) Object.assign(f, makeFish(), { x: -60, dir: 1 });
+        if (f.dir === -1 && f.x < -60)     Object.assign(f, makeFish(), { x: W() + 60, dir: -1 });
+        drawFish(f);
+      });
+
+      requestAnimationFrame(loop);
+    }
+
+    initScene();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
