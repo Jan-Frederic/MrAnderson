@@ -77,8 +77,14 @@
       position:relative; min-width:42px; height:42px; padding:0 4px;
     }
     .key .shift-char { position:absolute; top:3px; right:5px; font-size:.6rem; color:rgba(255,255,255,.45); }
-    .key.highlight { filter:brightness(1.6); transform:scale(1.08); color:#fff; }
-    .key.pressed  { filter:brightness(2); transform:scale(1.05); }
+    .key.highlight {
+      filter:brightness(2.8);
+      transform:scale(1.12);
+      color:#fff;
+      box-shadow:0 0 14px 4px currentColor;
+      z-index:2;
+    }
+    .key.pressed  { filter:brightness(3.5); transform:scale(1.08); box-shadow:0 0 20px 6px currentColor; }
     .key.wide-1 { min-width:56px; }
     .key.wide-2 { min-width:70px; }
     .key.wide-3 { min-width:84px; }
