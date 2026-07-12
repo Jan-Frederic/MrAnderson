@@ -62,6 +62,8 @@
     }
     .lvl-btn.active { border-color:var(--accent); color:var(--text); background:var(--panel); }
     .lvl-btn.unlocked { color:var(--text); }
+    .blind-btn { font-size:.65rem; padding:3px 8px; opacity:.7; border-style:dashed; margin-top:-2px; }
+    .blind-btn.active { opacity:1; }
 
     /* ── Stats ──────────────────────────────────────── */
     #stats { display:flex; flex-direction:column; gap:6px; font-size:.8rem; }
@@ -266,6 +268,7 @@ function numWords() {
 
 // ── State ────────────────────────────────────────────────────────
 let currentLevel = 0;
+let blindMode    = false;   // true = keyboard hidden (repeat of preceding level)
 let targetText   = "";
 let typed        = [];
 let startTime    = null;
@@ -346,11 +349,22 @@ function buildLevelBar() {
   const bar = document.getElementById("level-bar");
   bar.innerHTML = "";
   LEVELS.forEach((lv, i) => {
+    // Normal level button
     const btn = document.createElement("button");
-    btn.className = "lvl-btn" + (i===currentLevel ? " active" : "") + (i<=currentLevel ? " unlocked" : "");
+    const isActivNormal = i === currentLevel && !blindMode;
+    btn.className = "lvl-btn" + (isActivNormal ? " active" : "") + (i <= currentLevel ? " unlocked" : "");
     btn.textContent = lv.name;
-    btn.onclick = () => { currentLevel = i; startLevel(); };
+    btn.onclick = () => { currentLevel = i; blindMode = false; startLevel(); };
     bar.appendChild(btn);
+
+    // Blind follow-up button
+    const bBtn = document.createElement("button");
+    const isActivBlind = i === currentLevel && blindMode;
+    bBtn.className = "lvl-btn blind-btn" + (isActivBlind ? " active" : "") + (i <= currentLevel ? " unlocked" : "");
+    bBtn.textContent = "👁‍🗨 Blind";
+    bBtn.title = lv.name + " – ohne Tastatur";
+    bBtn.onclick = () => { currentLevel = i; blindMode = true; startLevel(); };
+    bar.appendChild(bBtn);
   });
 }
 
@@ -391,9 +405,9 @@ function highlightKey(ch) {
       k.classList.add("highlight");
     }
   });
-  // Show hint
+  // Show hint (only when keyboard is visible)
   const hint = document.getElementById("hint");
-  if (info) {
+  if (info && !blindMode) {
     const name = FINGER_NAMES[info.finger];
     hint.textContent = ch === " " ? "Leertaste · Daumen" : `„${ch}" → ${name}`;
   }
@@ -470,10 +484,20 @@ function finishLevel() {
   document.getElementById("res-title").textContent = acc >= 90 ? "✅ Ausgezeichnet!" : "✔️ Geschafft!";
   document.getElementById("res-stats").textContent =
     `${wpm} WPM · ${acc}% Genauigkeit · ${Math.round(elapsed)}s`;
+  document.getElementById("res-btn").textContent = !blindMode
+    ? "👁‍🗨 Weiter (Blindmodus)"
+    : (currentLevel < LEVELS.length - 1 ? "Nächstes Level →" : "🏆 Nochmal");
   document.getElementById("result").style.display = "block";
 
   document.getElementById("res-btn").onclick = () => {
-    if (acc >= 85 && currentLevel < LEVELS.length - 1) currentLevel++;
+    if (!blindMode) {
+      // After normal level → show same level blind
+      blindMode = true;
+    } else {
+      // After blind level → advance to next normal level
+      blindMode = false;
+      if (acc >= 85 && currentLevel < LEVELS.length - 1) currentLevel++;
+    }
     startLevel();
   };
   document.getElementById("hint").textContent = "";
@@ -500,7 +524,13 @@ function startLevel() {
   targetText = LEVELS[currentLevel].words();
   buildLevelBar();
   renderText();
-  highlightKey(targetText[0]);
+
+  // Show/hide keyboard
+  const kbdWrap = document.getElementById("keyboard-wrap");
+  kbdWrap.style.visibility = blindMode ? "hidden" : "visible";
+  document.getElementById("hint").textContent = blindMode ? "🙈 Blindmodus – Tastatur ausgeblendet" : "";
+
+  if (!blindMode) highlightKey(targetText[0]);
   document.getElementById("input").focus();
 }
 
